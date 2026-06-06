@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -8,7 +8,18 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const provider = new GoogleAuthProvider();
 
-export const loginWithGoogle = () => signInWithPopup(auth, provider);
+export const loginWithGoogle = async () => {
+  try {
+    return await signInWithPopup(auth, provider);
+  } catch (error: any) {
+    console.error("Popup login failed: ", error);
+    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request' || error.message?.includes('popup')) {
+      console.warn("Popup blocked. Falling back to redirect sign-in...");
+      return await signInWithRedirect(auth, provider);
+    }
+    throw error;
+  }
+};
 export const logout = () => signOut(auth);
 
 export enum OperationType {
