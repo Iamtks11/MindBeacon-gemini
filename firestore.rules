@@ -23,7 +23,10 @@ service cloud.firestore {
         (data.keys().hasAny(['concern']) ? (data.concern is string && data.concern.size() <= 2000) : true) &&
         (data.keys().hasAny(['riskLevel']) ? (data.riskLevel is string && data.riskLevel.size() <= 50) : true) &&
         (data.keys().hasAny(['summary']) ? (data.summary is string && data.summary.size() <= 2000) : true) &&
-        (data.keys().hasAny(['recommendations']) ? (data.recommendations is list && data.recommendations.size() <= 10 && (data.recommendations.size() > 0 ? data.recommendations[0] is string : true)) : true);
+        (data.keys().hasAny(['recommendations']) ? (data.recommendations is list && data.recommendations.size() <= 10 && (data.recommendations.size() > 0 ? data.recommendations[0] is string : true)) : true) &&
+        (data.keys().hasAny(['examType']) ? (data.examType is string && data.examType.size() <= 50) : true) &&
+        (data.keys().hasAny(['examPhase']) ? (data.examPhase is string && data.examPhase.size() <= 50) : true) &&
+        (data.keys().hasAny(['stressTriggers']) ? (data.stressTriggers is list && data.stressTriggers.size() <= 10 && (data.stressTriggers.size() > 0 ? data.stressTriggers[0] is string : true)) : true);
     }
 
     function isValidJournal(data, userId) {

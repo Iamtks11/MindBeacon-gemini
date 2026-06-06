@@ -10,7 +10,10 @@ export interface Checkin {
   riskLevel?: 'low' | 'medium' | 'high';
   summary?: string;
   recommendations?: string[];
-  createdAt: number;
+  examType?: string;
+  examPhase?: string;
+  stressTriggers?: string[];
+  createdAt: any; // Can be number or Firestore Timestamp
 }
 
 export interface JournalEntry {
@@ -20,7 +23,7 @@ export interface JournalEntry {
   identifiedEmotion?: string;
   reflection?: string;
   followUpQuestion?: string;
-  createdAt: number;
+  createdAt: any; // Can be number or Firestore Timestamp
 }
 
 export interface WeeklyInsight {
@@ -32,5 +35,5 @@ export interface WeeklyInsight {
   burnoutRisk: 'low' | 'medium' | 'high';
   startDate: number;
   endDate: number;
-  createdAt: number;
+  createdAt: any; // Can be number or Firestore Timestamp
 }
