@@ -1,0 +1,6 @@
+{
+  "name": "MindBeacon",
+  "description": "A mental wellness tracker for students preparing for competitive exams. Features AI guided daily check-ins, an emotional journal, and weekly insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

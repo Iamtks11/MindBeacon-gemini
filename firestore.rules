@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidCheckin(data, userId) {
+      return data.keys().hasAll(['userId', 'mood', 'stress', 'sleep', 'study', 'beaconScore', 'createdAt']) &&
+        data.userId == userId &&
+        data.mood is number && data.mood >= 1 && data.mood <= 10 &&
+        data.stress is number && data.stress >= 1 && data.stress <= 10 &&
+        data.sleep is number && data.sleep >= 0 && data.sleep <= 24 &&
+        data.study is number && data.study >= 0 && data.study <= 24 &&
+        data.beaconScore is number && data.beaconScore >= 0 && data.beaconScore <= 100 &&
+        data.createdAt == request.time &&
+        (data.keys().hasAny(['concern']) ? (data.concern is string && data.concern.size() <= 2000) : true) &&
+        (data.keys().hasAny(['riskLevel']) ? (data.riskLevel is string && data.riskLevel.size() <= 50) : true) &&
+        (data.keys().hasAny(['summary']) ? (data.summary is string && data.summary.size() <= 2000) : true) &&
+        (data.keys().hasAny(['recommendations']) ? (data.recommendations is list && data.recommendations.size() <= 10 && (data.recommendations.size() > 0 ? data.recommendations[0] is string : true)) : true);
+    }
+
+    function isValidJournal(data, userId) {
+      return data.keys().hasAll(['userId', 'entry', 'createdAt']) &&
+        data.userId == userId &&
+        data.entry is string && data.entry.size() <= 5000 &&
+        data.createdAt == request.time &&
+        (data.keys().hasAny(['identifiedEmotion']) ? (data.identifiedEmotion is string && data.identifiedEmotion.size() <= 100) : true) &&
+        (data.keys().hasAny(['reflection']) ? (data.reflection is string && data.reflection.size() <= 3000) : true) &&
+        (data.keys().hasAny(['followUpQuestion']) ? (data.followUpQuestion is string && data.followUpQuestion.size() <= 1000) : true);
+    }
+
+    function isValidInsight(data, userId) {
+        return data.keys().hasAll(['userId', 'averageMood', 'positiveTrend', 'burnoutRisk', 'startDate', 'endDate', 'createdAt']) &&
+          data.userId == userId &&
+          data.averageMood is string && data.averageMood.size() <= 100 &&
+          data.positiveTrend is string && data.positiveTrend.size() <= 500 &&
+          data.burnoutRisk is string && data.burnoutRisk.size() <= 50 &&
+          data.startDate is number && data.endDate is number &&
+          data.createdAt == request.time &&
+          (data.keys().hasAny(['topStressTriggers']) ? (data.topStressTriggers is list && data.topStressTriggers.size() <= 10 && (data.topStressTriggers.size() > 0 ? data.topStressTriggers[0] is string : true)) : true);
+    }
+
+    match /users/{userId} {
+      match /checkins/{checkinId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(checkinId) && isValidCheckin(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(checkinId) && incoming().createdAt == existing().createdAt && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['riskLevel', 'summary', 'recommendations']);
+      }
+      
+      match /journals/{journalId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(journalId) && isValidJournal(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(journalId) && incoming().createdAt == existing().createdAt && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['identifiedEmotion', 'reflection', 'followUpQuestion']);
+      }
+
+      match /insights/{insightId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(insightId) && isValidInsight(incoming(), userId);
+        allow update: if false; // Insights are generated once 
+      }
+    }
+  }
+}

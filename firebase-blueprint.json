@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "Checkin": {
+      "title": "Daily Check-in",
+      "description": "A student's daily wellness checkin",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "mood": { "type": "number" },
+        "stress": { "type": "number" },
+        "sleep": { "type": "number" },
+        "study": { "type": "number" },
+        "concern": { "type": "string" },
+        "beaconScore": { "type": "number" },
+        "riskLevel": { "type": "string" },
+        "summary": { "type": "string" },
+        "recommendations": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "mood", "stress", "sleep", "study", "beaconScore", "createdAt"]
+    },
+    "JournalEntry": {
+      "title": "Journal Entry",
+      "description": "A free-text journal entry for emotional processing",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "entry": { "type": "string" },
+        "identifiedEmotion": { "type": "string" },
+        "reflection": { "type": "string" },
+        "followUpQuestion": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "entry", "createdAt"]
+    },
+    "WeeklyInsight": {
+      "title": "Weekly Insight",
+      "description": "AI generated weekly summary",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "averageMood": { "type": "string" },
+        "topStressTriggers": { "type": "array", "items": { "type": "string" } },
+        "positiveTrend": { "type": "string" },
+        "burnoutRisk": { "type": "string" },
+        "startDate": { "type": "number" },
+        "endDate": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "averageMood", "positiveTrend", "burnoutRisk", "startDate", "endDate", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/checkins/{checkinId}": {
+      "schema": { "$ref": "#/entities/Checkin" },
+      "description": "Daily checkins for the user. We use split collection path to ensure parent-child."
+    },
+    "users/{userId}/journals/{journalId}": {
+      "schema": { "$ref": "#/entities/JournalEntry" },
+      "description": "Journal entries for the user."
+    },
+    "users/{userId}/insights/{insightId}": {
+      "schema": { "$ref": "#/entities/WeeklyInsight" },
+      "description": "Weekly insights for the user."
+    }
+  }
+}

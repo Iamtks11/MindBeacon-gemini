@@ -1,0 +1,36 @@
+export interface Checkin {
+  id?: string;
+  userId: string;
+  mood: number;
+  stress: number;
+  sleep: number;
+  study: number;
+  concern?: string;
+  beaconScore: number;
+  riskLevel?: 'low' | 'medium' | 'high';
+  summary?: string;
+  recommendations?: string[];
+  createdAt: number;
+}
+
+export interface JournalEntry {
+  id?: string;
+  userId: string;
+  entry: string;
+  identifiedEmotion?: string;
+  reflection?: string;
+  followUpQuestion?: string;
+  createdAt: number;
+}
+
+export interface WeeklyInsight {
+  id?: string;
+  userId: string;
+  averageMood: string;
+  topStressTriggers?: string[];
+  positiveTrend: string;
+  burnoutRisk: 'low' | 'medium' | 'high';
+  startDate: number;
+  endDate: number;
+  createdAt: number;
+}
