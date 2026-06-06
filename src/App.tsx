@@ -4,6 +4,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 import { CheckinForm } from './components/CheckinForm';
 import { Dashboard } from './components/Dashboard';
 import { JournalForm } from './components/JournalForm';
@@ -16,6 +17,11 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>('dashboard');
+  const [isIframe, setIsIframe] = useState(false);
+
+  useEffect(() => {
+    setIsIframe(window.self !== window.top);
+  }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -24,6 +30,24 @@ export default function App() {
     });
     return unsub;
   }, []);
+
+  const handleLogin = async () => {
+    try {
+      await loginWithGoogle();
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      if (err.code === 'auth/popup-blocked' || err.message?.includes('popup')) {
+        toast.error("Popup Blocked", {
+          description: "Please enable popups or open this site in a new tab to sign in.",
+          duration: 10000,
+        });
+      } else {
+        toast.error("Login Failed", {
+          description: err.message || "Failed to authenticate. Please try again.",
+        });
+      }
+    }
+  };
 
   if (loading) {
     return <div className="flex h-screen items-center justify-center bg-[#fdfbf7]"><p className="text-[#7a7a60]">Loading MindBeacon...</p></div>;
@@ -44,7 +68,12 @@ export default function App() {
             <p className="text-sm text-[#7a7a60] text-center">
               Sign in with Google to securely track your mood, manage stress, and receive AI-guided reflections.
             </p>
-            <Button onClick={loginWithGoogle} className="w-full bg-[#5a5a40] hover:bg-[#4a4a35] text-white rounded-xl py-3 font-bold">Sign in with Google</Button>
+            <Button onClick={handleLogin} className="w-full bg-[#5a5a40] hover:bg-[#4a4a35] text-white rounded-xl py-3 font-bold">Sign in with Google</Button>
+            {isIframe && (
+              <div className="text-xs text-[#8f5b24] bg-[#fff9eb] border border-[#ffe099] rounded-xl p-3 mt-1 leading-relaxed">
+                <span className="font-bold">⚠️ Running in preview frame:</span> Popups are often blocked in previews. If the login doesn't complete, please open this app in a new browser tab.
+              </div>
+            )}
             <p className="text-xs text-[#9a9a80] text-center italic">
               Disclaimer: This is a wellness tool, not a substitute for professional mental health support.
             </p>
