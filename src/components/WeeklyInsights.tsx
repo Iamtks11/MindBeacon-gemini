@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
-import { collection, query, where, orderBy, getDocs, setDoc, doc, limit } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, setDoc, doc, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, serverTimestamp } from '../lib/firebase';
 import { analyzeWeekly } from '../lib/api';
 import { WeeklyInsight, Checkin, JournalEntry } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Loader2, Zap, TrendingUp, AlertTriangle, AlertCircle, Sparkles } from 'lucide-react';
+import { Loader2, Zap, TrendingUp, AlertTriangle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const getSafeMillis = (val: any): number => {
@@ -18,7 +18,13 @@ const getSafeMillis = (val: any): number => {
   return Date.now();
 };
 
-export function WeeklyInsights({ user }: { user: User }) {
+interface WeeklyInsightsProps {
+  user: User;
+  checkins: Checkin[];
+  journals: JournalEntry[];
+}
+
+export function WeeklyInsights({ user, checkins, journals }: WeeklyInsightsProps) {
   const [insight, setInsight] = useState<WeeklyInsight | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -41,7 +47,6 @@ export function WeeklyInsights({ user }: { user: User }) {
       }
     } catch (err) {
       console.warn("Insights query error, falling back to simple query", err);
-      // Fallback in case indexing is building
       const fallbackQ = query(
         collection(db, 'users', user.uid, 'insights'),
         limit(10)
@@ -60,47 +65,17 @@ export function WeeklyInsights({ user }: { user: User }) {
   const generateInsight = async () => {
     setGenerating(true);
     try {
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      const sevenDaysAgoDate = new Date(sevenDaysAgo);
-      
-      // Fetch checkins and journals
-      const checkinsQ = query(
-        collection(db, 'users', user.uid, 'checkins'),
-        where('createdAt', '>=', sevenDaysAgoDate)
-      );
-      const journalsQ = query(
-        collection(db, 'users', user.uid, 'journals'),
-        where('createdAt', '>=', sevenDaysAgoDate)
-      );
-      
-      const [checkinsSnap, journalsSnap] = await Promise.all([
-        getDocs(checkinsQ).catch(e => {
-          console.warn("Checkins fetch failed in insights, fallback to limit", e);
-          return getDocs(query(collection(db, 'users', user.uid, 'checkins'), limit(30)));
-        }),
-        getDocs(journalsQ).catch(e => {
-          console.warn("Journals fetch failed in insights, fallback to limit", e);
-          return getDocs(query(collection(db, 'users', user.uid, 'journals'), limit(15)));
-        })
-      ]);
-      
-      const checkins = checkinsSnap.docs
-        .map(d => d.data() as Checkin)
-        .filter(c => getSafeMillis(c.createdAt) >= sevenDaysAgo);
-        
-      const journals = journalsSnap.docs
-        .map(d => d.data() as JournalEntry)
-        .filter(j => getSafeMillis(j.createdAt) >= sevenDaysAgo);
-      
       if (checkins.length === 0 && journals.length === 0) {
-        toast.error("Not enough data to generate an insight.", {
+        toast.error("Not enough data to generate an weekly report.", {
           description: "Please complete at least one daily check-in or journal entry first."
         });
         setGenerating(false);
         return;
       }
 
-      // Prepare payload with all exam context and triggers
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+      // Prepare payload with all exam context and triggers from props
       const payload = {
         checkins: checkins.map(c => ({
           mood: c.mood,
@@ -194,7 +169,7 @@ export function WeeklyInsights({ user }: { user: User }) {
                }`}>
                  {insight.burnoutRisk} Risk
                </span>
-               <p className="text-xs text-[#7a7a60] mt-1.5 leading-relaxed">
+               <p className="text-xs text-[#7a7a60] mt-1.5 leading-relaxed font-medium">
                  Calculated by analyzing consistency in study workloads versus sleep hours during your recent exam preparation.
                </p>
              </CardContent>
@@ -212,7 +187,7 @@ export function WeeklyInsights({ user }: { user: User }) {
                <span className="text-xl font-bold font-serif text-[#4a4a35] capitalize">
                  {insight.averageMood}
                </span>
-               <p className="text-xs text-[#7a7a60] mt-2 leading-relaxed">
+               <p className="text-xs text-[#7a7a60] mt-2 leading-relaxed font-medium">
                  Summarized emotional tone derived from your recent journal reflections and mood logs.
                </p>
              </CardContent>

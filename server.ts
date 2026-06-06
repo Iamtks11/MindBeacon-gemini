@@ -6,6 +6,11 @@ import admin from 'firebase-admin';
 import fs from 'fs';
 import { z } from 'zod';
 
+// Declare custom Request interface for Type Safety
+interface AuthenticatedRequest extends express.Request {
+  user?: admin.auth.DecodedIdToken;
+}
+
 // Initialize Firebase Admin
 let projectId = 'demo-project';
 try {
@@ -80,7 +85,7 @@ async function startServer() {
   });
 
   // Middleware to verify Firebase Auth token
-  const authenticate = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authenticate = async (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -89,7 +94,7 @@ async function startServer() {
     const token = authHeader.split('Bearer ')[1];
     try {
       const decoded = await admin.auth().verifyIdToken(token);
-      (req as any).user = decoded;
+      req.user = decoded;
       next();
     } catch (e) {
       console.error("Token verification failed", e);
@@ -99,8 +104,8 @@ async function startServer() {
   };
 
   // Rate Limiting Middleware (Applied to AI Endpoints)
-  const rateLimiter = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const user = (req as any).user;
+  const rateLimiter = (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
+    const user = req.user;
     const key = user ? user.uid : req.ip || 'anonymous';
     const now = Date.now();
     
@@ -119,7 +124,7 @@ async function startServer() {
   };
 
   // 1. Analyze Check-in
-  app.post('/api/analyze-checkin', authenticate, rateLimiter, async (req, res) => {
+  app.post('/api/analyze-checkin', authenticate, rateLimiter, async (req: AuthenticatedRequest, res) => {
     try {
       // Validate input
       const validation = checkinSchema.safeParse(req.body);
@@ -167,7 +172,7 @@ Provide a JSON response with the following exact structure:
   });
 
   // 2. Analyze Journal
-  app.post('/api/analyze-journal', authenticate, rateLimiter, async (req, res) => {
+  app.post('/api/analyze-journal', authenticate, rateLimiter, async (req: AuthenticatedRequest, res) => {
     try {
       // Validate input
       const validation = journalSchema.safeParse(req.body);
@@ -205,7 +210,7 @@ Provide a JSON response with the following exact structure:
   });
 
   // 3. Weekly Insights Summary
-  app.post('/api/analyze-weekly', authenticate, rateLimiter, async (req, res) => {
+  app.post('/api/analyze-weekly', authenticate, rateLimiter, async (req: AuthenticatedRequest, res) => {
     try {
       // Validate input
       const validation = weeklySchema.safeParse(req.body);

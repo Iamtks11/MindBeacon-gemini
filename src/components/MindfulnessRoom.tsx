@@ -185,8 +185,8 @@ export function MindfulnessRoom() {
       <CardContent className="p-6 flex flex-col items-center">
         {/* Breathing Pattern Selector */}
         <div className="w-full flex flex-col gap-2 mb-8">
-          <label htmlFor="pattern-selector" className="text-xs font-bold uppercase tracking-wider text-[#9a9a80]">Choose Technique</label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2" id="pattern-selector" role="radiogroup">
+          <span className="text-xs font-bold uppercase tracking-wider text-[#9a9a80]">Choose Technique</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2" id="pattern-selector" role="group" aria-label="Breathing techniques">
             {PATTERNS.map((p) => {
               const selected = selectedPattern.name === p.name;
               return (
@@ -198,8 +198,7 @@ export function MindfulnessRoom() {
                       ? 'border-[#5a5a40] bg-[#5a5a40]/5 text-[#5a5a40] font-semibold'
                       : 'border-[#edeae4] hover:bg-stone-50 text-stone-600'
                   }`}
-                  role="radio"
-                  aria-checked={selected}
+                  aria-pressed={selected}
                 >
                   <span className="font-bold block mb-1">{p.name}</span>
                   <span className="text-[11px] leading-relaxed text-[#7a7a60] font-normal">{p.description}</span>

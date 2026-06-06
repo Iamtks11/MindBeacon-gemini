@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { auth, loginWithGoogle, logout } from './lib/firebase';
+import { auth, loginWithGoogle, logout, db } from './lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
@@ -12,14 +13,28 @@ import { WeeklyInsights } from './components/WeeklyInsights';
 import { MindfulnessRoom } from './components/MindfulnessRoom';
 import { SupportResources } from './components/SupportResources';
 import { Heart, Activity, BookOpen, BarChart3, LogOut, Sparkles, PhoneCall } from 'lucide-react';
+import { Checkin, JournalEntry } from './types';
 
 type View = 'dashboard' | 'checkin' | 'journal' | 'insights' | 'mindfulness' | 'support';
+
+const getSafeMillis = (val: any): number => {
+  if (!val) return Date.now();
+  if (typeof val === 'number') return val;
+  if (typeof val.toMillis === 'function') return val.toMillis();
+  if (val.seconds) return val.seconds * 1000;
+  return Date.now();
+};
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>('dashboard');
   const [isIframe, setIsIframe] = useState(false);
+
+  // In-Memory Shared Cache State to maximize Efficiency and minimize redundant DB reads
+  const [checkins, setCheckins] = useState<Checkin[]>([]);
+  const [journals, setJournals] = useState<JournalEntry[]>([]);
+  const [dbLoading, setDbLoading] = useState(false);
 
   useEffect(() => {
     setIsIframe(window.self !== window.top);
@@ -32,6 +47,75 @@ export default function App() {
     });
     return unsub;
   }, []);
+
+  // Shared Firestore Realtime Snapshot Listeners (Single connection active per session)
+  useEffect(() => {
+    if (!user) {
+      setCheckins([]);
+      setJournals([]);
+      setDbLoading(false);
+      return;
+    }
+
+    setDbLoading(true);
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const sevenDaysAgoDate = new Date(sevenDaysAgo);
+
+    // 1. Checkins listener
+    const checkinsQ = query(
+      collection(db, 'users', user.uid, 'checkins'),
+      where('createdAt', '>=', sevenDaysAgoDate),
+      orderBy('createdAt', 'asc')
+    );
+
+    const unsubCheckins = onSnapshot(checkinsQ, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Checkin));
+      data.sort((a, b) => getSafeMillis(a.createdAt) - getSafeMillis(b.createdAt));
+      setCheckins(data);
+      setDbLoading(false);
+    }, (err) => {
+      console.warn("Checkins query failed, falling back to simple query", err);
+      const fallbackQ = query(
+        collection(db, 'users', user.uid, 'checkins'),
+        limit(20)
+      );
+      onSnapshot(fallbackQ, (fallbackSnap) => {
+        const data = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as Checkin));
+        data.sort((a, b) => getSafeMillis(a.createdAt) - getSafeMillis(b.createdAt));
+        setCheckins(data);
+        setDbLoading(false);
+      });
+    });
+
+    // 2. Journals listener
+    const journalsQ = query(
+      collection(db, 'users', user.uid, 'journals'),
+      where('createdAt', '>=', sevenDaysAgoDate),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubJournals = onSnapshot(journalsQ, (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as JournalEntry));
+      data.sort((a, b) => getSafeMillis(b.createdAt) - getSafeMillis(a.createdAt));
+      setJournals(data);
+    }, (err) => {
+      console.warn("Journals query failed, using limit fallback", err);
+      const fallbackQ = query(
+        collection(db, 'users', user.uid, 'journals'),
+        limit(10)
+      );
+      onSnapshot(fallbackQ, (fallbackSnap) => {
+        const data = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as JournalEntry));
+        data.sort((a, b) => getSafeMillis(b.createdAt) - getSafeMillis(a.createdAt));
+        setJournals(data);
+      });
+    });
+
+    return () => {
+      unsubCheckins();
+      unsubJournals();
+    };
+  }, [user]);
 
   const handleLogin = async () => {
     try {
@@ -142,16 +226,28 @@ export default function App() {
 
         {/* Dynamic Content Window */}
         <div className="flex-1" role="region" aria-live="polite">
-          {view === 'dashboard' && <Dashboard user={user} />}
+          {view === 'dashboard' && (
+            <Dashboard 
+              checkins={checkins} 
+              journals={journals} 
+              loading={dbLoading} 
+            />
+          )}
           {view === 'checkin' && <CheckinForm user={user} onComplete={() => setView('dashboard')} />}
           {view === 'journal' && <JournalForm user={user} onComplete={() => setView('dashboard')} />}
-          {view === 'insights' && <WeeklyInsights user={user} />}
+          {view === 'insights' && (
+            <WeeklyInsights 
+              user={user} 
+              checkins={checkins} 
+              journals={journals} 
+            />
+          )}
           {view === 'mindfulness' && <MindfulnessRoom />}
           {view === 'support' && <SupportResources />}
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation (Scrollable / beautiful layout) */}
+      {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-10 flex h-16 items-center justify-around border-t border-[#e5e1da] bg-white px-4 md:hidden" role="navigation" aria-label="Mobile navigation">
         <MobileNavButton view="dashboard" current={view} onClick={setView} icon={<Activity />} label="Dash" />
         <MobileNavButton view="checkin" current={view} onClick={setView} icon={<Heart />} label="Checkin" />

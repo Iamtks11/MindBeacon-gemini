@@ -1,13 +1,10 @@
-import { useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Checkin, JournalEntry } from '../types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { format } from 'date-fns';
 import { motion } from 'motion/react';
-import { Activity, BookOpen, ShieldAlert, Sparkles, Target, Zap, Clock, AlertCircle } from 'lucide-react';
+import { Activity, BookOpen, Target, Zap, Clock } from 'lucide-react';
 
 const EXAM_DATES: Record<string, string> = {
   'JEE': '2027-01-24',
@@ -27,69 +24,13 @@ const getSafeMillis = (val: any): number => {
   return Date.now();
 };
 
-export function Dashboard({ user }: { user: User }) {
-  const [checkins, setCheckins] = useState<Checkin[]>([]);
-  const [journals, setJournals] = useState<JournalEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+interface DashboardProps {
+  checkins: Checkin[];
+  journals: JournalEntry[];
+  loading: boolean;
+}
 
-  useEffect(() => {
-    // 7 days ago limit
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    
-    const checkinsQ = query(
-      collection(db, 'users', user.uid, 'checkins'),
-      where('createdAt', '>=', new Date(sevenDaysAgo)),
-      orderBy('createdAt', 'asc')
-    );
-    
-    const unsubCheckins = onSnapshot(checkinsQ, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Checkin));
-      // Sort in memory just in case the compound index is still building or ordering is missing
-      data.sort((a, b) => getSafeMillis(a.createdAt) - getSafeMillis(b.createdAt));
-      setCheckins(data);
-      setLoading(false);
-    }, (err) => {
-      // Fallback: If query fails due to index missing, try a simpler query without orderBy/where
-      console.warn("Index warning, falling back to simple query", err);
-      const fallbackQ = query(
-        collection(db, 'users', user.uid, 'checkins'),
-        limit(20)
-      );
-      return onSnapshot(fallbackQ, (fallbackSnap) => {
-        const data = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as Checkin));
-        data.sort((a, b) => getSafeMillis(a.createdAt) - getSafeMillis(b.createdAt));
-        setCheckins(data);
-        setLoading(false);
-      }, (e) => handleFirestoreError(e, OperationType.LIST, 'users/checkins'));
-    });
-
-    const journalsQ = query(
-      collection(db, 'users', user.uid, 'journals'),
-      orderBy('createdAt', 'desc'),
-      limit(3)
-    );
-    
-    const unsubJournals = onSnapshot(journalsQ, (snap) => {
-      setJournals(snap.docs.map(d => ({ id: d.id, ...d.data() } as JournalEntry)));
-    }, (err) => {
-      console.warn("Journals query failed, falling back to simple query", err);
-      const fallbackJournalsQ = query(
-        collection(db, 'users', user.uid, 'journals'),
-        limit(5)
-      );
-      return onSnapshot(fallbackJournalsQ, (fallbackSnap) => {
-        const data = fallbackSnap.docs.map(d => ({ id: d.id, ...d.data() } as JournalEntry));
-        data.sort((a, b) => getSafeMillis(b.createdAt) - getSafeMillis(a.createdAt));
-        setJournals(data);
-      }, (e) => handleFirestoreError(e, OperationType.LIST, 'users/journals'));
-    });
-
-    return () => {
-      unsubCheckins();
-      unsubJournals();
-    };
-  }, [user.uid]);
-
+export function Dashboard({ checkins, journals, loading }: DashboardProps) {
   if (loading) {
     return (
       <div className="flex flex-col gap-4 w-full" role="status" aria-busy="true">
@@ -119,7 +60,6 @@ export function Dashboard({ user }: { user: User }) {
     const diff = new Date(examDateStr).getTime() - Date.now();
     daysRemaining = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   } else {
-    // default/Other
     daysRemaining = 30;
   }
 
@@ -197,7 +137,7 @@ export function Dashboard({ user }: { user: User }) {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="flex h-48 items-center justify-center text-[#9a9a80] text-sm text-center">
+              <div className="flex h-48 items-center justify-center text-[#9a9a80] text-sm text-center font-medium">
                 Not enough check-in data yet.<br />Submit daily check-ins to unlock your charts.
               </div>
             )}
@@ -230,7 +170,7 @@ export function Dashboard({ user }: { user: User }) {
                 </div>
               </div>
             ) : (
-              <div className="flex h-36 w-36 items-center justify-center rounded-full bg-[#fdfbf7] text-[#9a9a80] text-xs text-center p-4 border border-[#edeae4]">
+              <div className="flex h-36 w-36 items-center justify-center rounded-full bg-[#fdfbf7] text-[#9a9a80] text-xs text-center p-4 border border-[#edeae4] font-medium">
                 Complete daily check-in to compute score
               </div>
             )}
@@ -248,7 +188,7 @@ export function Dashboard({ user }: { user: User }) {
           <div className="relative z-10 flex flex-col h-full justify-between">
             <div>
               <span className="inline-flex items-center gap-1 bg-[#5a5a40]/10 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-[#5a5a40] mb-3">
-                <Sparkles className="h-3 w-3" /> Personalized Advice
+                <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" /> Personalized Advice
               </span>
               {isToday ? (
                 <div className="space-y-3">
@@ -257,7 +197,7 @@ export function Dashboard({ user }: { user: User }) {
                   </p>
                   <div className="space-y-1.5 pt-2">
                     {todayCheckin.recommendations?.slice(0, 2).map((rec, i) => (
-                      <div key={i} className="flex gap-2 items-start text-xs text-[#4a4a35] leading-relaxed">
+                      <div key={i} className="flex gap-2 items-start text-xs text-[#4a4a35] leading-relaxed font-semibold">
                         <span className="h-1.5 w-1.5 rounded-full bg-[#5a5a40] mt-1.5 shrink-0" />
                         <span>{rec}</span>
                       </div>
@@ -265,7 +205,7 @@ export function Dashboard({ user }: { user: User }) {
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-[#7a7a60] leading-relaxed">
+                <p className="text-xs text-[#7a7a60] leading-relaxed font-medium">
                   Log your day with the daily check-in to receive instant AI stress coaching and personalized balance advice.
                 </p>
               )}
@@ -277,7 +217,7 @@ export function Dashboard({ user }: { user: User }) {
         <Card className="bg-white border border-[#edeae4] rounded-3xl p-6 shadow-sm flex flex-col justify-between">
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#9a9a80] mb-3 flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" /> Key Stress Triggers
+              <Activity className="h-3.5 w-3.5 text-emerald-500" /> Key Stress Triggers
             </h4>
             {sortedTriggers.length > 0 ? (
               <div className="space-y-2">
@@ -288,13 +228,13 @@ export function Dashboard({ user }: { user: User }) {
                       <span className="text-[#9a9a80]">{count}x logged</span>
                     </div>
                     <div className="w-full bg-[#f4f1ec] h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-[#5a5a40] h-full" style={{ width: `${(count / checkins.length) * 100}%` }}></div>
+                      <div className="bg-[#5a5a40] h-full" style={{ width: `${(count / Math.max(1, checkins.length)) * 100}%` }}></div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-[#7a7a60] leading-relaxed">
+              <p className="text-xs text-[#7a7a60] leading-relaxed font-medium">
                 Identify stress triggers by adding them during your daily check-in.
               </p>
             )}
@@ -309,12 +249,12 @@ export function Dashboard({ user }: { user: User }) {
                 <span className="inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-[#fdfbf7] text-[#9a9a80] border border-[#e5e1da] mb-1">
                   {journals[0].identifiedEmotion || 'Emotion'}
                 </span>
-                <p className="text-xs text-[#4a4a35] italic line-clamp-2">
+                <p className="text-xs text-[#4a4a35] italic line-clamp-2 font-medium">
                   "{journals[0].reflection}"
                 </p>
               </div>
             ) : (
-              <p className="text-xs text-[#7a7a60] italic">No reflections saved yet.</p>
+              <p className="text-xs text-[#7a7a60] italic font-medium">No reflections saved yet.</p>
             )}
           </div>
         </Card>

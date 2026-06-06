@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 
 // Recreate the Zod validation schemas from server.ts to test their rules
@@ -103,6 +103,35 @@ describe('Backend Zod Input Validation', () => {
       };
       const res = weeklySchema.safeParse(payload);
       expect(res.success).toBe(true);
+    });
+  });
+
+  describe('Rate Limiter Logic', () => {
+    it('should rate limit requests when limit is exceeded', () => {
+      const rateLimitsMap = new Map<string, { count: number; resetAt: number }>();
+      const key = 'test-user';
+      const now = Date.now();
+      const limit = 3;
+      const window = 60000;
+
+      const checkRateLimit = (userKey: string): boolean => {
+        const info = rateLimitsMap.get(userKey);
+        if (!info || now > info.resetAt) {
+          rateLimitsMap.set(userKey, { count: 1, resetAt: now + window });
+          return true; // allowed
+        } else {
+          if (info.count >= limit) {
+            return false; // blocked
+          }
+          info.count += 1;
+          return true; // allowed
+        }
+      };
+
+      expect(checkRateLimit(key)).toBe(true);
+      expect(checkRateLimit(key)).toBe(true);
+      expect(checkRateLimit(key)).toBe(true);
+      expect(checkRateLimit(key)).toBe(false); // 4th request blocked
     });
   });
 });

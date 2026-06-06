@@ -13,6 +13,7 @@ service cloud.firestore {
 
     function isValidCheckin(data, userId) {
       return data.keys().hasAll(['userId', 'mood', 'stress', 'sleep', 'study', 'beaconScore', 'createdAt']) &&
+        data.keys().hasOnly(['userId', 'mood', 'stress', 'sleep', 'study', 'beaconScore', 'createdAt', 'concern', 'riskLevel', 'summary', 'recommendations', 'examType', 'examPhase', 'stressTriggers']) &&
         data.userId == userId &&
         data.mood is number && data.mood >= 1 && data.mood <= 10 &&
         data.stress is number && data.stress >= 1 && data.stress <= 10 &&
@@ -31,6 +32,7 @@ service cloud.firestore {
 
     function isValidJournal(data, userId) {
       return data.keys().hasAll(['userId', 'entry', 'createdAt']) &&
+        data.keys().hasOnly(['userId', 'entry', 'createdAt', 'identifiedEmotion', 'reflection', 'followUpQuestion']) &&
         data.userId == userId &&
         data.entry is string && data.entry.size() <= 5000 &&
         data.createdAt == request.time &&
@@ -41,6 +43,7 @@ service cloud.firestore {
 
     function isValidInsight(data, userId) {
         return data.keys().hasAll(['userId', 'averageMood', 'positiveTrend', 'burnoutRisk', 'startDate', 'endDate', 'createdAt']) &&
+          data.keys().hasOnly(['userId', 'averageMood', 'positiveTrend', 'burnoutRisk', 'startDate', 'endDate', 'createdAt', 'topStressTriggers']) &&
           data.userId == userId &&
           data.averageMood is string && data.averageMood.size() <= 100 &&
           data.positiveTrend is string && data.positiveTrend.size() <= 500 &&
